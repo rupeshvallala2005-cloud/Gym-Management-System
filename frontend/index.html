@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gym Management System</title>
+
+
+<style>
+    * {
+        box-sizing: border-box;
+        font-family: Arial, sans-serif;
+    }
+
+    body {
+        margin: 0;
+        background: #f4f6f9;
+        display: flex;
+        min-height: 100vh;
+    }
+
+    .sidebar {
+        width: 230px;
+        background: #172033;
+        padding: 20px 12px;
+        color: white;
+    }
+
+    .sidebar h2 {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .sidebar button {
+        width: 100%;
+        padding: 13px;
+        margin-bottom: 8px;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: white;
+        text-align: left;
+        cursor: pointer;
+        font-size: 15px;
+    }
+
+    .sidebar button:hover,
+    .sidebar button.active {
+        background: #30415f;
+    }
+
+    .main {
+        flex: 1;
+        padding: 30px;
+        min-width: 0;
+    }
+
+    .header {
+        margin-bottom: 25px;
+    }
+
+    .content,
+    .card {
+        background: white;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+
+    .card h3 {
+        color: #666;
+        margin-top: 0;
+    }
+
+    .card p {
+        font-size: 24px;
+        font-weight: bold;
+        color: #172033;
+    }
+
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 7px;
+    }
+
+    input {
+        width: 100%;
+        max-width: 500px;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 15px;
+    }
+
+    .submit-btn,
+    .edit-btn {
+        background: #172033;
+        color: white;
+        border: none;
+        padding: 11px 20px;
+        border-radius: 6px;
+        font-size: 15px;
+        cursor: pointer;
+    }
+
+    .edit-btn {
+        padding: 8px 14px;
+    }
+
+    .secondary-btn {
+        background: #777;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        min-width: 900px;
+        border-collapse: collapse;
+    }
+
+    th,
+    td {
+        padding: 12px;
+        border-bottom: 1px solid #ddd;
+        text-align: left;
+    }
+
+    th {
+        background: #172033;
+        color: white;
+    }
+
+    .message {
+        margin-top: 15px;
+        font-weight: bold;
+    }
+
+    .search-box {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .summary {
+        background: #f4f6f9;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 15px 0;
+    }
+
+    .summary p {
+        margin: 8px 0;
+    }
+
+    @media (max-width: 700px) {
+        body {
+            flex-direction: column;
+        }
+
+        .sidebar {
+            width: 100%;
+        }
+
+        .main {
+            padding: 15px;
+        }
+    }
+</style>
+
+
+</head>
+
+<body>
+
+
+<div class="sidebar">
+    <h2>GYM MANAGER</h2>
+
+    <button class="active" onclick="showPage('dashboard', this)">
+        Dashboard
+    </button>
+
+    <button onclick="showPage('add', this)">
+        Add Member
+    </button>
+
+    <button onclick="showPage('members', this)">
+        View Members
+    </button>
+
+    <button onclick="showPage('payments', this)">
+        Record Payment
+    </button>
+
+    <button onclick="showPage('history', this)">
+        Payment History
+    </button>
+
+    <button onclick="showPage('pending', this)">
+        Pending Payments
+    </button>
+</div>
+
+
+<div class="main">
+
+    <div class="header">
+        <h1 id="pageTitle">Dashboard</h1>
+        <p>Welcome to Gym Management System</p>
+    </div>
+
+    <div id="pageContent"></div>
+
+</div>
+
+
+<script>
+
+    const API = "http://127.0.0.1:8000";
+
+
+    function escapeHTML(value) {
+
+        return String(value ?? "").replace(/[&<>"']/g, function(character) {
+
+            return {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;"
+            }[character];
+
+        });
+
+    }
+
+
+    async function fetchData(url, options = {}) {
+
+        const response = await fetch(API + url, options);
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Request failed");
+        }
+
+        return data;
+
+    }
+
+
+    function setupPhoneInput(input) {
+
+        input.addEventListener("input", function() {
+
+            this.value = this.value
+                .replace(/\D/g, "")
+                .slice(0, 10);
+
+        });
+
+    }
+
+
+    function setupDateInput(input) {
+
+        input.addEventListener("input", function() {
+
+            let value = this.value.replace(/\D/g, "").slice(0, 8);
+
+            if (value.length > 4) {
+                value = value.slice(0, 2) + "-" +
+                        value.slice(2, 4) + "-" +
+                        value.slice(4);
+            }
+
+            else if (value.length > 2) {
+                value = value.slice(0, 2) + "-" +
+                        value.slice(2);
+            }
+
+            this.value = value;
+
+        });
+
+    }
+
+
+    // ---------------- DASHBOARD ----------------
+
+    async function loadDashboard() {
+
+        const page = document.getElementById("pageContent");
+
+        page.innerHTML =
+            "<div class='content'>Loading dashboard...</div>";
+
+        try {
+
+            const data = await fetchData("/dashboard");
+
+            page.innerHTML = `
+
+                <div class="cards">
+
+                    <div class="card">
+                        <h3>Total Members</h3>
+                        <p>${data.total_members}</p>
+                    </div>
+
+                    <div class="card">
+                        <h3>Total Collection</h3>
+                        <p>₹${data.total_collection}</p>
+                    </div>
+
+                    <div class="card">
+                        <h3>Total Pending</h3>
+                        <p>₹${data.total_pending}</p>
+                    </div>
+
+                    <div class="card">
+                        <h3>Pending Members</h3>
+                        <p>${data.pending_members}</p>
+                    </div>
+
+                </div>
+
+                <div class="content">
+                    <h2>Dashboard Overview</h2>
+                    <p>
+                        Track members, payments, and pending
+                        balances easily.
+                    </p>
+                </div>
+            `;
+
+        }
+
+        catch(error) {
+
+            page.innerHTML = `
+                <div class="content">
+                    <p style="color:red;">
+                        ${escapeHTML(error.message)}
+                    </p>
+                </div>
+            `;
+
+        }
+
+    }
+
+
+    // ---------------- ADD MEMBER ----------------
+
+    function showAddMember() {
+
+        document.getElementById("pageContent").innerHTML = `
+
+            <div class="content">
+
+                <h2>Register New Member</h2>
+
+                <form id="memberForm">
+
+                    <div class="form-group">
+                        <label>Member Name</label>
+                        <input type="text" id="name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Mobile Number</label>
+                        <input type="text"
+                               id="phone"
+                               placeholder="Enter exactly 10 digits"
+                               maxlength="10"
+                               inputmode="numeric"
+                               required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Joining Date (DD-MM-YYYY)</label>
+                        <input type="text"
+                               id="joining_date"
+                               placeholder="DD-MM-YYYY"
+                               maxlength="10"
+                               required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Monthly Fee (₹)</label>
+                        <input type="number"
+                               id="monthly_fee"
+                               min="1"
+                               required>
+                    </div>
+
+                    <button type="submit" class="submit-btn">
+                        Add Member
+                    </button>
+
+                </form>
+
+                <p id="message" class="message"></p>
+
+            </div>
+        `;
+
+        setupPhoneInput(document.getElementById("phone"));
+        setupDateInput(document.getElementById("joining_date"));
+
+        document.getElementById("memberForm")
+            .addEventListener("submit", addMember);
+
+    }
+
+
+    async function addMember(event) {
+
+        event.preventDefault();
+
+        const message = document.getElementById("message");
+        const phone = document.getElementById("phone").value.trim();
+
+        if (!/^\d{10}$/.test(phone)) {
+
+            message.style.color = "red";
+            message.innerText =
+                "Invalid mobile number. Please enter exactly 10 digits.";
+
+            return;
+
+        }
+
+        const member = {
+            name: document.getElementById("name").value.trim(),
+            phone: phone,
+            joining_date:
+                document.getElementById("joining_date").value.trim(),
+            monthly_fee:
+                Number(document.getElementById("monthly_fee").value)
+        };
+
+        try {
+
+            await fetchData("/members", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(member)
+            });
+
+            message.style.color = "green";
+            message.innerText = "Member added successfully!";
+
+            document.getElementById("memberForm").reset();
+
+        }
+
+        catch(error) {
+
+            message.style.color = "red";
+            message.innerText = error.message;
+
+        }
+
+    }
+
+
+    // ---------------- VIEW MEMBERS ----------------
+
+    async function showMembers() {
+
+        const page = document.getElementById("pageContent");
+
+        page.innerHTML =
+            "<div class='content'>Loading members...</div>";
+
+        try {
+
+            const members = await fetchData("/members");
+
+            let rows = "";
+
+            members.forEach(member => {
+
+                rows += `
+                    <tr>
+                        <td>${escapeHTML(member.name)}</td>
+                        <td>${escapeHTML(member.phone)}</td>
+                        <td>${escapeHTML(member.joining_date)}</td>
+                        <td>₹${escapeHTML(member.monthly_fee)}</td>
+                        <td>₹${member.total_due}</td>
+                        <td>₹${member.total_paid}</td>
+                        <td>₹${member.pending_amount}</td>
+                        <td>${escapeHTML(member.status)}</td>
+                        <td>
+                            <button class="edit-btn"
+                                    onclick="showEditMember(${member.id})">
+                                Edit
+                            </button>
+                        </td>
+                    </tr>
+                `;
+
+            });
+
+            if (members.length === 0) {
+
+                rows = `
+                    <tr>
+                        <td colspan="9">
+                            No members registered yet.
+                        </td>
+                    </tr>
+                `;
+
+            }
+
+            page.innerHTML = `
+
+                <div class="content">
+
+                    <h2>Registered Members</h2>
+
+                    <div class="table-container">
+
+                        <table>
+
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Joining Date</th>
+                                    <th>Monthly Fee</th>
+                                    <th>Total Due</th>
+                                    <th>Total Paid</th>
+                                    <th>Pending</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                ${rows}
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+            `;
+
+        }
+
+        catch(error) {
+
+            page.innerHTML = `
+                <div class="content">
+                    <p style="color:red;">
+                        ${escapeHTML(error.message)}
+                    </p>
+                </div>
+            `;
+
+        }
+
+    }
+
+
+    // ---------------- EDIT MEMBER ----------------
+
+    async function showEditMember(memberId) {
+
+        const page = document.getElementById("pageContent");
+
+        page.innerHTML =
+            "<div class='content'>Loading member details...</div>";
+
+        try {
+
+            const members = await fetchData("/members");
+
+            const member = members.find(
+                item => item.id === memberId
+            );
+
+            if (!member) {
+                throw new Error("Member not found.");
+            }
+
+            document.getElementById("pageTitle").innerText =
+                "Edit Member";
+
+            page.innerHTML = `
+
+                <div class="content">
+
+                    <h2>Edit Member Details</h2>
+
+                    <form id="editMemberForm">
+
+                        <div class="form-group">
+                            <label>Member Name</label>
+                            <input type="text"
+                                   id="edit_name"
+                                   value="${escapeHTML(member.name)}"
+                                   required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Mobile Number</label>
+                            <input type="text"
+                                   id="edit_phone"
+                                   value="${escapeHTML(member.phone)}"
+                                   maxlength="10"
+                                   inputmode="numeric"
+                                   required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Joining Date</label>
+                            <input type="text"
+                                   id="edit_joining_date"
+                                   value="${escapeHTML(member.joining_date)}"
+                                   maxlength="10"
+                                   required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Monthly Fee (₹)</label>
+                            <input type="number"
+                                   id="edit_monthly_fee"
+                                   value="${member.monthly_fee}"
+                                   min="1"
+                                   required>
+                        </div>
+
+                        <button type="submit"
+                                class="submit-btn">
+                            Save Changes
+                        </button>
+
+                        <button type="button"
+                                class="submit-btn secondary-btn"
+                                onclick="showMembers()">
+                            Cancel
+                        </button>
+
+                    </form>
+
+                    <p id="editMessage" class="message"></p>
+
+                </div>
+            `;
+
+            setupPhoneInput(
+                document.getElementById("edit_phone")
+            );
+
+            setupDateInput(
+                document.getElementById("edit_joining_date")
+            );
+
+            document.getElementById("editMemberForm")
+                .addEventListener("submit", async function(event) {
+
+                    event.preventDefault();
+
+                    const phone =
+                        document.getElementById("edit_phone")
+                            .value.trim();
+
+                    const message =
+                        document.getElementById("editMessage");
+
+                    if (!/^\d{10}$/.test(phone)) {
+
+                        message.style.color = "red";
+                        message.innerText =
+                            "Invalid mobile number. Please enter exactly 10 digits.";
+
+                        return;
+
+                    }
+
+                    const updatedMember = {
+                        name:
+                            document.getElementById("edit_name")
+                                .value.trim(),
+
+                        phone: phone,
+
+                        joining_date:
+                            document.getElementById(
+                                "edit_joining_date"
+                            ).value.trim(),
+
+                        monthly_fee:
+                            Number(
+                                document.getElementById(
+                                    "edit_monthly_fee"
+                                ).value
+                            )
+                    };
+
+                    try {
+
+                        await fetchData(
+                            "/members/" + memberId,
+                            {
+                                method: "PUT",
+                                headers: {
+                                    "Content-Type": "application/json"
+                                },
+                                body: JSON.stringify(updatedMember)
+                            }
+                        );
+
+                        message.style.color = "green";
+                        message.innerText =
+                            "Member details updated successfully!";
+
+                    }
+
+                    catch(error) {
+
+                        message.style.color = "red";
+                        message.innerText = error.message;
+
+                    }
+
+                });
+
+        }
+
+        catch(error) {
+
+            page.innerHTML = `
+                <div class="content">
+                    <p style="color:red;">
+                        ${escapeHTML(error.message)}
+                    </p>
+                </div>
+            `;
+
+        }
+
+    }
+
+
+    // ---------------- RECORD PAYMENT ----------------
+
+    function showPayments() {
+
+        document.getElementById("pageContent").innerHTML = `
+
+            <div class="content">
+
+                <h2>Record Member Payment</h2>
+
+                <div class="form-group">
+                    <label>Member Mobile Number</label>
+                    <input type="text"
+                           id="paymentPhone"
+                           placeholder="Enter 10-digit mobile number">
+                </div>
+
+                <button class="submit-btn"
+                        onclick="searchPaymentMember()">
+                    Search Member
+                </button>
+
+                <div id="memberDetails"></div>
+
+                <p id="paymentMessage"
+                   class="message"></p>
+
+            </div>
+        `;
+
+        setupPhoneInput(
+            document.getElementById("paymentPhone")
+        );
+
+    }
+
+
+    async function searchPaymentMember() {
+
+        const phone =
+            document.getElementById("paymentPhone").value.trim();
+
+        const details =
+            document.getElementById("memberDetails");
+
+        if (!/^\d{10}$/.test(phone)) {
+
+            details.innerHTML = `
+                <p style="color:red;">
+                    Enter a valid 10-digit mobile number.
+                </p>
+            `;
+
+            return;
+
+        }
+
+        try {
+
+            const member = await fetchData(
+                "/members/search/" + phone
+            );
+
+            details.innerHTML = `
+
+                <hr style="margin:20px 0;">
+
+                <h3>Member Payment Details</h3>
+
+                <div class="summary">
+
+                    <p><b>Name:</b>
+                        ${escapeHTML(member.name)}
+                    </p>
+
+                    <p><b>Monthly Fee:</b>
+                        ₹${member.monthly_fee}
+                    </p>
+
+                    <p><b>Months Due:</b>
+                        ${member.months_due}
+                    </p>
+
+                    <p><b>Total Amount Due:</b>
+                        ₹${member.total_due}
+                    </p>
+
+                    <p><b>Total Amount Paid:</b>
+                        ₹${member.total_paid}
+                    </p>
+
+                    <p><b>Pending Amount:</b>
+                        ₹${member.pending_amount}
+                    </p>
+
+                    <p><b>Status:</b>
+                        ${escapeHTML(member.status)}
+                    </p>
+
+                </div>
+
+                <div class="form-group">
+
+                    <label>Payment Amount (₹)</label>
+
+                    <input type="number"
+                           id="paymentAmount"
+                           value="${member.pending_amount}"
+                           min="1"
+                           max="${member.pending_amount}">
+
+                </div>
+
+                <button class="submit-btn"
+                        onclick="savePayment()">
+                    Save Payment
+                </button>
+            `;
+
+        }
+
+        catch(error) {
+
+            details.innerHTML = `
+                <p style="color:red;">
+                    ${escapeHTML(error.message)}
+                </p>
+            `;
+
+        }
+
+    }
+
+
+    async function savePayment() {
+
+        const phone =
+            document.getElementById("paymentPhone").value.trim();
+
+        const amount = Number(
+            document.getElementById("paymentAmount").value
+        );
+
+        const message =
+            document.getElementById("paymentMessage");
+
+        if (amount <= 0) {
+
+            message.style.color = "red";
+            message.innerText =
+                "Please enter a valid payment amount.";
+
+            return;
+
+        }
+
+        try {
+
+            const result = await fetchData("/payments", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    phone: phone,
+                    amount: amount
+                })
+            });
+
+            message.style.color = "green";
+
+            message.innerHTML = `
+                Payment recorded successfully!<br>
+                Total Due: ₹${result.total_due}<br>
+                Total Paid: ₹${result.total_paid}<br>
+                Pending Amount: ₹${result.pending_amount}<br>
+                Status: ${escapeHTML(result.status)}
+            `;
+
+            // Refresh member details with the new balance
+            searchPaymentMember();
+
+        }
+
+        catch(error) {
+
+            message.style.color = "red";
+            message.innerText = error.message;
+
+        }
+
+    }
+
+
+    // ---------------- PAYMENT HISTORY ----------------
+
+    function showHistory() {
+
+        document.getElementById("pageContent").innerHTML = `
+
+            <div class="content">
+
+                <h2>Payment History</h2>
+
+                <div class="search-box">
+
+                    <input type="text"
+                           id="historyPhone"
+                           placeholder="Enter mobile number">
+
+                    <button class="submit-btn"
+                            onclick="loadHistory()">
+                        Search
+                    </button>
+
+                </div>
+
+                <div id="historyResults"></div>
+
+            </div>
+        `;
+
+        setupPhoneInput(
+            document.getElementById("historyPhone")
+        );
+
+    }
+
+
+    async function loadHistory() {
+
+        const phone =
+            document.getElementById("historyPhone").value.trim();
+
+        const results =
+            document.getElementById("historyResults");
+
+        if (!/^\d{10}$/.test(phone)) {
+
+            results.innerHTML = `
+                <p style="color:red;">
+                    Enter a valid 10-digit mobile number.
+                </p>
+            `;
+
+            return;
+
+        }
+
+        try {
+
+            const data = await fetchData(
+                "/payments/" + phone
+            );
+
+            let rows = "";
+
+            data.payments.forEach(payment => {
+
+                rows += `
+                    <tr>
+                        <td>
+                            ${escapeHTML(payment.payment_date)}
+                        </td>
+                        <td>₹${escapeHTML(payment.amount)}</td>
+                        <td>
+                            ${escapeHTML(payment.status)}
+                        </td>
+                    </tr>
+                `;
+
+            });
+
+            if (data.payments.length === 0) {
+
+                rows = `
+                    <tr>
+                        <td colspan="3">
+                            No payment history found.
+                        </td>
+                    </tr>
+                `;
+
+            }
+
+            results.innerHTML = `
+
+                <div class="summary">
+
+                    <p><b>Months Due:</b>
+                        ${data.months_due}
+                    </p>
+
+                    <p><b>Total Due:</b>
+                        ₹${data.total_due}
+                    </p>
+
+                    <p><b>Total Paid:</b>
+                        ₹${data.total_paid}
+                    </p>
+
+                    <p><b>Pending Amount:</b>
+                        ₹${data.pending_amount}
+                    </p>
+
+                    <p><b>Status:</b>
+                        ${escapeHTML(data.status)}
+                    </p>
+
+                </div>
+
+                <div class="table-container">
+
+                    <table>
+
+                        <thead>
+                            <tr>
+                                <th>Payment Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            ${rows}
+                        </tbody>
+
+                    </table>
+
+                </div>
+            `;
+
+        }
+
+        catch(error) {
+
+            results.innerHTML = `
+                <p style="color:red;">
+                    ${escapeHTML(error.message)}
+                </p>
+            `;
+
+        }
+
+    }
+
+
+    // ---------------- PENDING PAYMENTS ----------------
+
+    async function showPending() {
+
+        const page =
+            document.getElementById("pageContent");
+
+        page.innerHTML =
+            "<div class='content'>Loading pending payments...</div>";
+
+        try {
+
+            const members =
+                await fetchData("/pending-payments");
+
+            let rows = "";
+
+            members.forEach(member => {
+
+                rows += `
+                    <tr>
+                        <td>${escapeHTML(member.name)}</td>
+                        <td>${escapeHTML(member.phone)}</td>
+                        <td>₹${member.total_due}</td>
+                        <td>₹${member.total_paid}</td>
+                        <td>₹${member.pending_amount}</td>
+                        <td>${escapeHTML(member.status)}</td>
+                    </tr>
+                `;
+
+            });
+
+            if (members.length === 0) {
+
+                rows = `
+                    <tr>
+                        <td colspan="6">
+                            No pending payments found.
+                        </td>
+                    </tr>
+                `;
+
+            }
+
+            page.innerHTML = `
+
+                <div class="content">
+
+                    <h2>Pending Payments</h2>
+
+                    <div class="table-container">
+
+                        <table>
+
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Total Due</th>
+                                    <th>Total Paid</th>
+                                    <th>Pending Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                ${rows}
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+            `;
+
+        }
+
+        catch(error) {
+
+            page.innerHTML = `
+                <div class="content">
+                    <p style="color:red;">
+                        ${escapeHTML(error.message)}
+                    </p>
+                </div>
+            `;
+
+        }
+
+    }
+
+
+    // ---------------- NAVIGATION ----------------
+
+    function showPage(page, button) {
+
+        document.querySelectorAll(".sidebar button")
+            .forEach(btn => {
+                btn.classList.remove("active");
+            });
+
+        if (button) {
+            button.classList.add("active");
+        }
+
+        const titles = {
+            dashboard: "Dashboard",
+            add: "Add Member",
+            members: "View Members",
+            payments: "Record Payment",
+            history: "Payment History",
+            pending: "Pending Payments"
+        };
+
+        document.getElementById("pageTitle").innerText =
+            titles[page];
+
+        if (page === "dashboard") {
+            loadDashboard();
+        }
+
+        else if (page === "add") {
+            showAddMember();
+        }
+
+        else if (page === "members") {
+            showMembers();
+        }
+
+        else if (page === "payments") {
+            showPayments();
+        }
+
+        else if (page === "history") {
+            showHistory();
+        }
+
+        else if (page === "pending") {
+            showPending();
+        }
+
+    }
+
+
+    // ---------------- START ----------------
+
+    loadDashboard();
+
+</script>
+```
+
+</body>
+</html>
